@@ -1,0 +1,1139 @@
+/**
+ * Created by yejiaming on 2016/5/9.
+ */
+define(['IFS'], function (app) {
+    app.directive('menuView', [function () {
+        return {
+            restrict: 'E',
+            templateUrl: function () {
+                return "template/menuView.html";
+            },
+            scope: {
+                treeData: '=',
+                id: "@",
+                pid: "@",
+                hasLeaf: "@",
+                textField: '@',
+                isLeft: '@',
+                itemTemplateUrl: '@',
+                itemClicked: '&',
+                getIcon: "&",
+                menu: "=",
+                moveLeft: "&",
+                isLeft: "=",
+                showLeve: "@",
+                children: "@"
+            },
+            controller: ['$scope', "$sce", function ($scope, $sce) {
+                var preItem;
+                var id = $scope.id;
+                $scope.menuId = "";
+                var copyPid = "$pid";
+                var pid = $scope.pid ? $scope.pid : copyPid;
+                var pidFlag = $scope.pid ? true : false;
+                var children = $scope.children;
+                var hasLeaf = $scope.hasLeaf;
+                var getAllNode = function () {
+                    return $scope.treeData;
+                }
+                /**
+                 * 监听result结果集
+                 */
+                $scope.$watch("treeData", function (newValue, oldValue) {
+                    if (angular.isUndefined(newValue) || newValue.length <= 0) {
+                        return;
+                    }
+                    if (!pidFlag) {
+                        hasParendId(newValue);
+                    }
+                }, true);
+                /**
+                 * 判断是否具有父级节点，没有就加上
+                 */
+                var hasParendId = function (tree) {
+                    if (angular.isArray(tree)) {
+                        var len = tree.length;
+                        for (var i = 0; i < len; i++) {
+                            var node = getNodeById(getAllNode(), tree[i][id]);
+                            if (angular.isDefined(node[pid]) && node[pid]) {
+                                tree[i][copyPid] = node[pid];
+                            }
+                            hasParendId(tree[i]);
+                        }
+                    } else {
+                        if ($scope.isLeaf(tree)) {
+                            var clen = tree[children].length
+                            for (var i = 0; i < clen; i++) {
+                                if (!tree[children][i][copyPid]) {
+                                    tree[children][i][copyPid] = tree[id];
+                                }
+                            }
+                            hasParendId(tree[children]);
+                        }
+                    }
+                };
+                $scope.getItemIcon = function (item) {
+                    if (item[children] && item[children][0].leafFlag == '0') {
+                        return item.$isExpend ? 'images/bottom.png' : 'images/left.png';
+                    }
+
+                };
+                $scope.getIconCallBack = function (callback, item) {
+                    return ($scope[callback] || angular.noop)({
+                        item: item
+                    });
+                };
+
+                /**
+                 * 显示子节点
+                 * @param callback
+                 * @param item
+                 * @param move
+                 * @param isLeft
+                 * @param $event
+                 */
+                $scope.warpCallback = function (callback, item, $event) {
+                    if (item.$isExpend == undefined) {
+                        item.$isExpend = false;
+                    }
+                    //改变节点颜色
+                    $scope.menuId = item[id];
+                    if (item[children] && item[children][0].leafFlag == '0') {
+                        if (angular.element(document.querySelector('.left-side-collapsed')).length == 1) {
+                            $scope.isLeft = false;
+                            if (item.$isExpend == false) {
+                                $scope.itemExpended(item, $event);
+                            }
+                        }
+                        else if (angular.element(document.querySelector('.left-side-collapsed')).length == 0) {
+                            $scope.itemExpended(item, $event);
+                        }
+                    } else {
+                        //该函数调用了外部函数callback,并使用angular.noop，防止外部函数不存在的情况
+                        ($scope[callback] || angular.noop)({
+                            item: item,
+                            $event: $event
+                        });
+                    }
+                };
+                /**
+                 * 改变字节点的状态
+                 */
+                $scope.itemExpended = function (item, $event) {
+                    item.$isExpend = !item.$isExpend;
+                    $event.stopPropagation();
+                };
+                /**
+                 * 判断是否含有子节点，并且子节点的长度大于0
+                 * @param item
+                 * @returns {boolean}
+                 */
+                $scope.isLeaf = function (item) {
+                    return item[children] && item[children].length;
+                };
+
+                /**
+                 * 通过ID判断两个节点是否相等
+                 * @param node
+                 * @param targetNode
+                 * @param id
+                 * @returns {boolean}
+                 */
+                var isEqual = function (node, targetNode, id) {
+                    if (node[id] === targetNode[id]) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+                /**
+                 * 通过ID获取节点
+                 * @param branch_no
+                 */
+                var getNodeById = function (arryNode, targetId) {
+                    var len = arryNode.length;
+                    for (var i = 0; i < len; i++) {
+                        if (arryNode[i][id] === targetId) {
+                            return arryNode[i];
+                        } else {
+                            if ($scope.isLeaf(arryNode[i])) {
+                                var node = getNodeById(arryNode[i][children], targetId);
+                                if (node) {
+                                    return node;
+                                }
+                            }
+                        }
+                    }
+                }
+                /**
+                 * 获取当前节点的父节点
+                 */
+                var getParent = function (node) {
+                    if (node[pid]) {
+                        return getNodeById(getAllNode, pid);
+                    } else {
+                        return getAllNode();
+                    }
+                };
+                /**
+                 *改变节点颜色
+                 */
+                var changeMenuStyle = function (item) {
+                    item["$showFlag"] = true;
+                    var nodes = getParent(item);
+                    var len = nodes.length;
+                    for (var i = 0; i < len; i++) {
+                        if (item[id] !== nodes[i][id]) {
+                            nodes[i]["$showFlag"] = false;
+                        }
+                    }
+                }
+            }]
+        };
+    }]);
+
+    /**
+     * 权限通用树
+     */
+    app.directive("rightTree", [function () {
+        return {
+            restrict: 'E',
+            link: function ($scope, element, attrs) {
+                // Trigger when number of children changes,
+                // including by directives like ng-repeat
+                var watch = $scope.$watch(function () {
+                    return element.children().length;
+                }, function () {
+                    // Wait for templates to render
+                    $scope.$evalAsync(function () {
+                        // Finally, directives are evaluated
+                        // and templates are renderer here
+                        //$scope.initExpand();
+                    });
+                });
+            },
+            templateUrl: function () {
+                return "template/rightView.html";
+            },
+            scope: {
+                isRightTree: "=",   //是否是权限树
+                treeData: '=',  //树的数据
+                textField: '@', //节点显示名称
+                mustDisplyText: '@', //必须显示的节点名称
+                id: "@",          //id(唯一标识）
+                pid: "@",        //父ID
+                hasRight: "@",   //是否具有权限
+                children: "@",      //孩子节点
+                itemClicked: "&", //点击节点
+                hasRightFun: "&",   //判断是否具有权限的外部方法
+                searchCallback: "&",   //搜索的事件回调
+                ownResult: "=",       //已经拥有权限的结果集
+                ownResultFlag: "=",    //是否有已经拥有权限的结果集
+                isChange: "=",        //是否改变
+                changeRight: "&",        //改变权限的回调
+                ownResultType: "@",        //已拥有的结果集是数组还是树
+                displayNode: "=",        //显示某一个节点
+                diplayAllFlag: "=",        //是否显示全部的textFiled
+                addResult: "=",        //添加结果集
+                delResult: "=",        //删除结果集
+                showLevel: "@",        //显示等级,如：3，那么3节点之前都会被显示，在已拥有结果集的刷新的时候
+                initShow: "@",        //权限树在初始化的时候是打钩，还是打岔
+            },
+            controller: ['$scope', function ($scope) {
+                var children = $scope.children || "children";
+                var textField = $scope.textField;
+                var textFieldArray = textField.split(",");
+                var fidldArry = textField.split(",");
+                var mustDisplyText = $scope.mustDisplyText;
+                var hasRight = $scope.hasRight;
+                var pidFlag = $scope.pid ? true : false;
+                /*总的是否含有pid*/
+                var orPidFlag = pidFlag;
+                /*orPidFlag表示已拥有结果集是否含有PID*/
+                var tdPidFlag = pidFlag;
+                /*tdPidFlag表示结果集是否含有PID*/
+                var copyPid = "$pid";
+                /*默认的pid名称为“$pid”*/
+                var pid = $scope.pid ? $scope.pid : copyPid;
+                /*如果没有pid，给一个默认的pid名称为“$pid”*/
+                var id = $scope.id;
+                /*id,这是必须的，唯一标识*/
+                var hasRightFun = $scope.hasRightFun;
+                var ownResult = $scope.ownResult;
+                var ownResultType = $scope.ownResultType;
+                var initShow = $scope.initShow;
+                /*初始化展示，是打钩还是打岔*/
+                var treeOverFlag = false;
+                var ownFlag = false;
+                var level = "$level";
+                var levelIndex = 1;
+                var displayNode = $scope.displayNode;
+                var diplayAllFlag = $scope.diplayAllFlag;
+                var showLevel = parseInt($scope.showLevel);
+                var ownResultCopy = [];
+                var nodeMap = {};
+                var nodeList = [];
+                var rootList = [];
+                var firstOperRoleExtend = 0;//默认收缩
+
+                var printTime = function (value) {
+                    var d = new Date();
+                    console.log(value + "=" + d.getMinutes() + ":" + d.getSeconds() + ":" + d.getMilliseconds());
+                }
+                /**
+                 *获取所有节点
+                 * @type {string}
+                 */
+                var getAllNode = function () {
+                    return $scope.treeData;
+                };
+                /**
+                 * 获取节点名称
+                 */
+                $scope.showField = function (item) {
+                    //printTime("showField");
+                    //console.log(item);
+                    //if (angular.isDefined(item["fieldStr"])) {
+                        var fieldStr1 = "";
+                        //console.log(fidldArry.length);
+                        //console.log(fidldArry[0]);
+                        for (var i = 0; i < fidldArry.length; i++) {
+                            fieldStr1 = fieldStr1 + " " + item[fidldArry[i]];
+                            //console.log(itembranchNo"]);
+                        }
+                        item["fieldStr"] = fieldStr1;
+                        //console.log(fieldStr);
+                        //console.log(item["fieldStr"]);
+                    //}
+
+                    return item["fieldStr"];
+                };
+
+                $scope.isLoaded = function (item) {
+                    return item["isLoaded"];
+                };
+                /**
+                 * 判断是否具有权限
+                 */
+                var hasRightCallback = function (item) {
+                    if (hasRightFun) {
+                        return $scope.$parent[hasRightFun](item);
+                    } else {
+                        if (parseInt(hasRight)) {
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    }
+                };
+                /**
+                 * 获取当前节点的父节点
+                 */
+                var getParent = function (node) {
+                    if (node[pid]) {
+                        return getNodeById(getAllNode, pid);
+                    }
+                };
+                /**
+                 * 通过ID判断两个节点是否相等
+                 * @param node
+                 * @param targetNode
+                 * @param id
+                 * @returns {boolean}
+                 */
+                var isEqual = function (node, targetNode, id) {
+                    if (node[id] === targetNode[id]) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+                /**
+                 * 通过ID获取节点
+                 * @param branch_no
+                 */
+                var getNodeById = function (arryNode, targetId) {
+                    //printTime("getNodeById");
+                    /* var len = arryNode.length;
+                     for (var i = 0; i < len; i++) {
+                     if (arryNode[i][id] === targetId) {
+                     return arryNode[i];
+                     } else {
+                     if ($scope.isLeaf(arryNode[i])) {
+                     var node = getNodeById(arryNode[i][children], targetId);
+                     if (node) {
+                     return node;
+                     }
+                     }
+                     }
+                     }*/
+                    return nodeMap[targetId];
+                }
+                /**
+                 * 判断是否需要展开
+                 * @param item
+                 * @param $event
+                 */
+                $scope.itemExpended = function (item, $event) {
+                    item.$isExpend = !item.$isExpend;
+                    $event.stopPropagation();
+                };
+                /**
+                 * 获取打开关闭的ICON
+                 * @param item
+                 * @returns {*}
+                 */
+                $scope.getItemIcon = function (item, first, middle, last) {
+                    var isLeaf = $scope.isLeaf(item);
+                    var iconStr = "";
+                    /*无子节点*/
+                    if (!isLeaf) {
+                        /*如果是一级节点*/
+                        if (item.$level === 1) {
+                            iconStr = "images/sy.png";
+                        } else { //如果是非一级节点
+                            /*只有一个节点的时候*/
+                            if (first && last) {
+                                iconStr = "images/sy.png";
+                            } else if (last) {    //末节点
+                                iconStr = "images/sy.png";
+                            } else if (first) {                   //首节点
+                                iconStr = "images/syx.png";
+                            } else {                                    //中间节点
+                                iconStr = "images/syx.png";
+                            }
+                        }
+                    } else {
+                        /*如果是一级节点*/
+                        if (item.$level === 1) {
+                            /*有子节点,且打开*/
+                            if (item.$isExpend) {
+                                /*只有一个节点的时候*/
+                                if (first && last) {
+                                    iconStr = "images/jiany.png";
+                                } else if (last) {
+                                    iconStr = "images/jiansy.png";
+                                } else if (first) {
+                                    iconStr = "images/jianyx.png";
+                                } else {
+                                    iconStr = "images/jiansyx.png";
+                                }
+                                /*有子节点，且关闭*/
+                            } else {
+                                /*只有一个节点的时候*/
+                                if (first && last) {
+                                    iconStr = "images/jiay.png";
+                                } else if (last) {
+                                    iconStr = "images/jiasy.png";
+                                } else if (first) {
+                                    iconStr = "images/jiayx.png";
+                                } else {
+                                    iconStr = "images/jiasyx.png";
+                                }
+                            }
+                        } else { //如果是非一级节点
+                            /*有子节点,且打开*/
+                            if (item.$isExpend) {
+                                /*只有一个节点的时候*/
+                                if (first && last) {
+                                    iconStr = "images/jiansy.png";
+                                } else if (last) {
+                                    iconStr = "images/jiansy.png";
+                                } else if (first) {
+                                    iconStr = "images/jiansyx.png";
+                                } else {
+                                    iconStr = "images/jiansyx.png";
+                                }
+                                /*有子节点，且关闭*/
+                            } else {
+                                /*只有一个节点的时候*/
+                                if (first && last) {
+                                    iconStr = "images/jiasy.png";
+                                } else if (last) {
+                                    iconStr = "images/jiasy.png";
+                                } else if (first) {
+                                    iconStr = "images/jiasyx.png";
+                                } else {
+                                    iconStr = "images/jiasyx.png";
+                                }
+                            }
+                        }
+                    }
+                    return iconStr;
+                };
+                /**
+                 * 获取权限ICON
+                 */
+                $scope.getRightIcon = function (item) {
+                    switch (item.$isIcon) {
+                        case undefined:
+                            return (initShow === undefined || initShow === "true") ? "icon-1 gou-color" : "icon-2 cha-color";    //如果initShow为true，那么就打钩，否则打岔
+                        case 1:
+                            return "icon-1 gou-color";    //为1是打钩
+                        case 2:
+                            return "icon-2 cha-color";    //为2是打岔
+                        case 3:
+                            return "icon-3 wenhao-bgcolor";    //为3是打问号
+                    }
+                };
+                /**
+                 * 有无子节点
+                 * @param item
+                 * @returns {boolean}
+                 */
+                $scope.isLeaf = function (item) {
+                    return angular.isDefined(item[children]) && item[children] !== null && item[children].length > 0;
+                };
+                /**
+                 * 改变权限图标
+                 * @param callback
+                 * @param item
+                 */
+                $scope.changeItemIcon = function (callback, item) {
+                    console.log(111);
+                    //if (item.roleId == undefined) {
+                    //    firstOperRoleExtend = 1;
+                    //}
+                    //else {
+                    //    firstOperRoleExtend = 0;
+                    //}
+                    //改变本节点的权限图标
+                    changeSelfIcon(item);
+                    //改变父级节点图标
+                    changeParentIcon(item);
+                    //改变子集节点图标
+                    changeChildrenIcon(item);
+                    //回调函数，传递结果集
+                    //console.log($scope.addResult);
+                    //console.log($scope.delResult);
+                    var curentItem = angular.copy(item);
+                    curentItem[children] = null;
+                    var root = angular.copy(getAllNode()[0]);
+                    root[children] = null;
+                    ($scope[callback] || angular.noop)({
+                        addResult: $scope.addResult,
+                        delResult: $scope.delResult,
+                        item: item,
+                        root: root
+                    });
+                    console.log($scope[callback]);
+                };
+                /**
+                 * 改变本节点的权限图标
+                 */
+                var changeSelfIcon = function (item) {
+                    switch (item.$isIcon) {
+                        case undefined:
+                            item.$isIcon = 2;   //打岔
+                            break;
+                        case 1:
+                            item.$isIcon = 2; //打岔
+                            break;
+                        case 2:
+                            item.$isIcon = 1; //打钩
+                            break;
+                        case 3:
+                            item.$isIcon = 1;//打钩
+                            break;
+                    }
+                    updateResult(item);
+                };
+                /*跟新结果集，addResult,delResult*/
+                var updateResult = function (item) {
+                    var index = isExist(ownResultCopy, item[id]);
+                    var delIndex = isExist($scope.delResult, item[id]);
+                    var addIndex = isExist($scope.addResult, item[id]);
+                    if (index >= 0) {    //如果在已拥有结果集中存在
+                        if (item.$isIcon === 1 || item.$isIcon === 3) {
+                            if (delIndex >= 0) {
+                                $scope.delResult.splice(delIndex, 1);
+                            }
+                        } else if (item.$isIcon === 2) {
+                            if (delIndex < 0) {
+                                $scope.delResult.push(item[id]);
+                            }
+                        } else {
+                            return;
+                        }
+                    } else {            //如果不存在
+                        if (item.$isIcon === 1) {
+                            if (addIndex < 0) {
+                                $scope.addResult.push(item[id]);
+                            }
+                        } else if (item.$isIcon === 2) {
+                            if (addIndex >= 0) {
+                                $scope.addResult.splice(addIndex, 1);
+                            }
+                        } else {
+                            return;
+                        }
+                    }
+                }
+
+                /**
+                 * 改变父节点的权限图标
+                 */
+                var changeParentIcon = function (node) {
+                    firstGruntRightParent(node, function (parentNode) {
+                        updateResult(parentNode);
+                    });
+                };
+                /**
+                 * 改变子集节点的图标
+                 * @param item  当前节点
+                 * @param isPush    是否放到结果集中delResult和addResult
+                 */
+                var changeChildrenIcon = function (item) {
+                    firstGruntRightChildren(item, function (child) {
+                        updateResult(child);
+                    });
+                };
+                /**
+                 * 下拉显示子节点
+                 * @param callback
+                 * @param item
+                 * @param $event
+                 */
+                $scope.warpCallback = function (item, $event) {
+                    if (!(item.children == null)) {
+                        $scope.itemExpended(item, $event);
+                        item["isLoaded"] = true;
+                    }
+                    return;
+                };
+                /**
+                 * 点击获取节点信息
+                 * @param callback
+                 * @param item
+                 * @param $event
+                 */
+                $scope.getItemCallback = function (callback, item) {
+                    if (!$scope[callback]) {
+                        return;
+                    }
+                    if (angular.isDefined($scope.isChange)) {
+                        $scope.isChange = item[id];
+                        if (!(angular.element(document.querySelector('#wenjianjia')) && (item.children == null))) {
+                            item.$isExpend = true;
+                        }
+                    }
+                    ($scope[callback] || angular.noop)({
+                        item: item
+                    });
+                };
+                /**
+                 * 控制是否显示textField还是mustField
+                 */
+                $scope.$watch("diplayAllFlag", function (newValue, oldValue) {
+                    if (angular.isDefined(newValue) && $scope.mustDisplyText) {
+                        if (!newValue) {
+                            fidldArry = [];
+                            fidldArry.push(mustDisplyText);
+                        } else {
+                            fidldArry = textField.split(",");
+                        }
+                    }
+                });
+                $scope.$watch("displayNode", function (newValue, oldValue) {
+                    if (angular.isArray(newValue)) {
+                        if (newValue[0] === "" || !newValue[0] || newValue.length <= 0) {
+                            preField = newValue[0];
+                            return;
+                        }
+                    } else {
+                        if (newValue === "" || !newValue) {
+                            preField = newValue;
+                            return;
+                        }
+                    }
+                    var field = "";
+                    var fieldIndex = 0;
+                    if (angular.isArray(newValue)) {
+                        field = newValue[0]; //0是需要查询的字符串
+                        fieldIndex = newValue[1];    //1是查询的位置，默认查询第一个位置
+                    } else {
+                        field = newValue;
+                    }
+                    /*如果两次查询的值相等就下一个*/
+                    if (preField === field) {
+                        /*如果查找的没了*/
+                        if (searchResult.length - 1 < fieldIndex) {
+                            ($scope["searchCallback"] || angular.noop)({
+                                length: searchResult.length,
+                                result: null
+                            });
+                            return;
+                        } else {
+                            //重置所有的节点岔并关闭
+                            loopTree(getAllNode(), function (node) {
+                                node.$isExpend = false;
+                            });
+                            searchNextNode(fieldIndex);
+                        }
+                        return;
+                    } else {
+                        preField = field;
+                        searchResult = [];
+                    }
+                    loopTree(getAllNode(), function (node) {
+                        findTextFieldArray(textFieldArray, node, field);
+                    });
+                    searchNextNode(0);
+                }, true);
+                /*查询某个节点*/
+                function searchNextNode(index) {
+                    if (searchResult.length <= 0) {
+                        ($scope["searchCallback"] || angular.noop)({
+                            length: searchResult.length,
+                            result: null
+                        });
+                        return;
+                    }
+                    /*回调*/
+                    ($scope["searchCallback"] || angular.noop)({
+                        length: searchResult.length,
+                        result: searchResult[index]
+                    });
+                    $scope.isChange = searchResult[index][id];
+
+                    searchResult[index].$isExpend = false;
+                    if (searchResult[index][pid]) {
+                        loopParent(getAllNode(), searchResult[index][pid], function (pNode) {
+                            pNode.$isExpend = true;
+                        })
+                    }
+                }
+
+                /**
+                 * 找到某个节点并打开
+                 * @param array
+                 * @param node
+                 * @param field
+                 */
+                var searchResult = [];  //查询出来的结果集
+                var preField = ""; //上一次查询的值
+                var findTextFieldArray = function (array, node, field) {
+                    //printTime("findTextFieldArray");
+                    var len = array.length;
+                    for (var i = 0; i < len; i++) {
+                        if (parseInt(field) === field) {
+                            /*精确查找*/
+                            if ((node[array[i]] + "") === (field + "")) {
+                                searchResult.push(node);
+                                return;
+                            } else {
+                                node.$isExpend = false;
+                            }
+                        } else {
+                            /*模糊匹配*/
+                            if ((node[array[i]] + "").indexOf(field + "") >= 0) {
+                                searchResult.push(node);
+                                return;
+                            } else {
+                                node.$isExpend = false;
+                            }
+                        }
+                    }
+                }
+
+                var scanTree = function (node, lvl) {
+                    nodeMap[node[id]] = node;
+                    nodeList.push(node);
+                    node[level] = lvl;
+                    if (showLevel && lvl <= showLevel) {  /*如果有显示多少个节点，就按显示多少个节点来*/
+                        node.$isExpend = true;
+                    } else {
+                        node.$isExpend = false;
+                    }
+                    var children = node["children"];
+                    if (children && children.length) {
+                        for (var i = 0; i < children.length; i++) {
+                            children[i][pid] = node[id];
+                            scanTree(children[i], lvl + 1);
+                        }
+                    }
+                }
+
+                var scanSelectTree = function (node) {
+                    var children = node["children"];
+                    if (children && children.length) {
+                        for (var i = 0; i < children.length; i++) {
+                            children[i][pid] = node[id];
+                            scanTree(children[i], lvl + 1);
+                        }
+                    }
+                }
+
+                /*添加parentId，当parentId不纯在的情况*/
+                var addParentId = function (newValue, targetPidFlag, callback) {
+                    if (!targetPidFlag) {
+                        hasParendId(newValue);
+                        if (callback) {
+                            callback();
+                        }
+                    }
+                }
+                /*给树添加等级*/
+                var addLevel = function (data, targetIndex) {
+                    //printTime("addLevel");
+                    if (angular.isArray(data)) {
+                        var len = data.length;
+                        for (var i = 0; i < len; i++) {
+                            data[i][level] = targetIndex;
+                            if (showLevel && targetIndex <= showLevel) {  /*如果有显示多少个节点，就按显示多少个节点来*/
+                                data[i].$isExpend = true;
+                            }
+                        }
+                        targetIndex++;
+                        for (var j = 0; j < len; j++) {
+                            if ($scope.isLeaf(data[j])) {
+                                addLevel(data[j][children], targetIndex);
+                            }
+                        }
+                    }
+                }
+                /**
+                 * 监听result结果集
+                 */
+                $scope.$watch("treeData", function (newValue, oldValue) {
+                    if (angular.isUndefined(newValue) || newValue.length <= 0) {
+                        return;
+                    }
+
+                    var data = getAllNode();
+                    //console.log(data);
+                    nodeMap = {};
+                    nodeList = [];
+                    rootList = [];
+                    if (angular.isArray(data)) {
+                        for (var i = 0; i < data.length; i++) {
+                            rootList.push(data[i]);
+                            scanTree(data[i], 1);
+                        }
+                    } else {
+                        rootList.push(data);
+                        scanTree(data, 1);
+                    }
+
+                    /*/*加父节点ID*!/
+                     addParentId(getAllNode(), tdPidFlag, function () {
+                     //tdPidFlag = !tdPidFlag;
+                     });
+                     /!*加等级*!/
+                     addLevel(getAllNode(), levelIndex);*/
+                    treeOverFlag = true;
+                    if (ownFlag) {
+                        ownResultDeal($scope.ownResult);
+                    }
+                });
+
+                /**
+                 * 判断是否具有父级节点，没有就加上
+                 */
+                var hasParendId = function (tree) {
+                    //printTime("hasParendId");
+                    if (angular.isArray(tree)) {
+                        var len = tree.length;
+                        for (var i = 0; i < len; i++) {
+                            var node = getNodeById(getAllNode(), tree[i][id]);
+                            if (angular.isDefined(node[pid]) && node[pid]) {
+                                tree[i][copyPid] = node[pid];
+                            }
+                            hasParendId(tree[i]);
+                        }
+                    } else {
+                        if ($scope.isLeaf(tree)) {
+                            var clen = tree[children].length
+                            for (var i = 0; i < clen; i++) {
+                                if (!tree[children][i][copyPid]) {
+                                    tree[children][i][copyPid] = tree[id];
+                                }
+                            }
+                            hasParendId(tree[children]);
+                        }
+                    }
+                };
+
+                /*监听delResult和addResult*/
+                $scope.$watch("addResult", function (newValue, oldValue) {
+                    if (angular.isUndefined(newValue)) {
+                        return;
+                    }
+                    ownResultCopy = ownResultCopy.concat(oldValue);
+                });
+                /*监听delResult和addResult*/
+                $scope.$watch("delResult", function (newValue, oldValue) {
+                    //printTime("delResult");
+                    if (angular.isUndefined(newValue)) {
+                        return;
+                    }
+                    var len = oldValue.length;
+                    for (var i = 0; i < len; i++) {
+                        var index = ownResultCopy.indexOf(oldValue[i]);
+                        if (index >= 0) {
+                            ownResultCopy.splice(index, 1);
+                        }
+                    }
+                });
+                /**
+                 * 监听ownResult结果集
+                 */
+                $scope.$watch("ownResult", function (newValue, oldValue) {
+                    if (angular.isUndefined(newValue)) {
+                        return;
+                    }
+                    if (treeOverFlag) {
+                        /*添加pid*/
+                        /*addParentId(getAllNode(), tdPidFlag, function () {
+                         //tdPidFlag = !tdPidFlag;
+                         });*/
+                        ownResultDeal($scope.ownResult);
+                    } else {
+                        ownFlag = true;
+                    }
+                }, true);
+                var ownResultDeal = function (newValue) {
+                    //重置所有的节点岔并关闭
+                    loopTree(getAllNode(), function (node) {
+                        node.$isIcon = 2;
+                        //node.$isExpend = false;
+                        node.$preIcon = undefined;
+                    });
+                    //如果已拥有的结果集是数组，那么久执行这个方法
+                    if (ownResultType === "array") {
+                        /*已拥有结果集副本*/
+                        ownResultCopy = angular.copy(newValue);
+                        $scope.changeArryDisplayRight(newValue);
+                    } else {
+                        ownResultCopy = [];
+                        //addParentId(newValue, orPidFlag);
+                        scanSelectTree(newValue);
+                        $scope.changeDisplayRight(newValue);
+                    }
+                };
+                //当已拥有结果集是数组
+                $scope.changeArryDisplayRight = function (ownResult) {
+                    //printTime("changeArryDisplayRight");
+                    var result = getAllNode();
+                    angular.forEach(ownResult, function (targetId) {
+                        var node = getNodeById(result, targetId);
+                        if (!node) {
+                            //console.error("找不到该节点:" + targetId);
+                            return;
+                        }
+                        if (node.$pid == null || node.$pid == undefined) {
+                            console.log(targetId);
+                        }
+                        /*改变当前节点*/
+                        firstGruntRgihtSelf(node, 1);
+                        /*改变父节点*/
+                        firstGruntRightParent(node, function (parent) {
+                            var index = isExist(ownResultCopy, parent);
+                            if (index < 0) {
+                                ownResultCopy.push(parent[id]);
+                            }
+                        });
+                        /*改变子节点*/
+                        firstGruntRightChildren(node, function (child) {
+                            var index = isExist(ownResultCopy, child);
+                            if (index < 0) {
+                                ownResultCopy.push(child[id]);
+                            }
+                        });
+                    });
+                };
+
+                /**
+                 *改变权限图标（当已经拥有的结果集是树）
+                 */
+                $scope.changeDisplayRight = function (ownResult) {
+                    //重置所有的节点岔并关闭
+                    loopTree(getAllNode(), function (node) {
+                        node.$isIcon = 2;
+                        node.$isExpend = false;
+                        node.$preIcon = undefined;
+                    });
+                    var result = getAllNode();
+                    /*已拥有结果集赋值权限，首次赋值*/
+                    firstGruntRight(ownResult, result);
+                };
+                /*已拥有结果集赋值权限，首次赋值*/
+                var firstGruntRight = function (targetResult, result) {
+                    //printTime("firstGruntRight");
+                    if (angular.isArray(targetResult)) {
+                        var len = targetResult.length;
+                        for (var i = 0; i < len; i++) {
+                            var index = isExist(ownResultCopy, targetResult[i]);
+                            if (index < 0) {
+                                ownResultCopy.push(targetResult[i][id]);
+                            }
+                            if ($scope.isLeaf(targetResult[i])) {
+                                firstGruntRight(targetResult[i][children], result);
+                            } else {
+                                firstGruntRight(targetResult[i], result);
+                            }
+                        }
+                    } else {
+                        var index = isExist(ownResultCopy, targetResult);
+                        if (index < 0) {
+                            ownResultCopy.push(targetResult[id]);
+                        }
+                        var node = getNodeById(result, targetResult[id]);
+                        if (!node) {
+                            //console.error("找不到该节点:" + targetResult[id]);
+                            return;
+                        }
+                        /*改变当前节点*/
+                        firstGruntRgihtSelf(node, 1);
+                        /*改变父节点*/
+                        firstGruntRightParent(node);
+                        /*改变子节点*/
+                        firstGruntRightChildren(node, function (child) {
+                            var index = isExist(ownResultCopy, child);
+                            if (index < 0) {
+                                ownResultCopy.push(child[id]);
+                            }
+                        });
+                    }
+                };
+                /*改变当前节点的权限图标*/
+                var firstGruntRgihtSelf = function (node, icon) {
+                    node.$isIcon = icon;
+                    /*当前节点*/
+                    node.$preIcon = icon;
+                    /*上一次节点图标*/
+                    if (showLevel) {  /*如果有显示多少个节点，就按显示多少个节点来，没有就只要赋值权限了就打开*/
+                        if (node[level] <= showLevel) {
+                            node.$isExpend = true;
+                        }
+                    } else {
+                        node.$isExpend = true;
+                    }
+                }
+                /*改变父节点的权限图标*/
+                var firstGruntRightParent = function (node, callback) {
+                    //printTime("firstGruntRightParent");
+                    var parentId = node[pid];
+                    if (angular.isDefined(parentId) && parentId !== "" && parentId !== null) {
+                        var parentNode = getNodeById(getAllNode(), parentId);
+                        var len = parentNode[children].length;
+                        var gouNum = 0;
+                        var chaNum = 0;
+                        var wenNum = 0;
+                        for (var i = 0; i < len; i++) {
+                            if (angular.isUndefined(parentNode[children][i].$isIcon) || parentNode[children][i].$isIcon === 1) {
+                                gouNum++;
+                            } else if (parentNode[children][i].$isIcon === 2) {
+                                chaNum++;
+                            } else {
+                                wenNum++;
+                            }
+                        }
+                        if (gouNum === len) {
+                            firstGruntRgihtSelf(parentNode, 1);
+                        } else if (chaNum === len) {
+                            firstGruntRgihtSelf(parentNode, 2);
+                        } else {
+                            firstGruntRgihtSelf(parentNode, 3);
+                            if (firstOperRoleExtend) {
+                                parentNode.$isExpend = true;
+                            }
+                        }
+                        /*如果回调存在，更新结果集*/
+                        if (callback) {
+                            callback(parentNode);
+                        }
+                        firstGruntRightParent(parentNode, callback);
+                    }
+                };
+                /*改变子节点的权限图标*/
+                var firstGruntRightChildren = function (node, callback) {
+                    //printTime("firstGruntRightChildren");
+                    if ($scope.isLeaf(node)) {
+                        var children = node[$scope.children];
+                        var len = children.length;
+                        for (var i = 0; i < len; i++) {
+                            firstGruntRgihtSelf(children[i], node.$isIcon);
+                            /*跟新子节点的结果集*/
+                            if (callback) {
+                                callback(children[i]);
+                            }
+                            firstGruntRightChildren(children[i], callback);
+                        }
+                    }
+                }
+
+                /**
+                 * 循环遍历父节点
+                 * @param result
+                 * @param pid
+                 * @param callback
+                 */
+                var loopParent = function (result, cpid, callback) {
+                    var parNode = getNodeById(result, cpid);
+                    callback(parNode);
+                    if (parNode[pid]) {
+                        loopParent(result, parNode[pid], callback);
+                    }
+                };
+
+                /**
+                 * 循环树,并回调
+                 */
+                var loopTree = function (tree, callback) {
+                    //printTime("loopTree");
+                    /*if (angular.isArray(tree)) {
+                     var len = tree.length;
+                     for (var i = 0; i < len; i++) {
+                     loopTree(tree[i], callback);
+                     }
+                     } else {
+                     callback(tree);
+                     if ($scope.isLeaf(tree)) {
+                     loopTree(tree[children], callback);
+                     }
+                     }*/
+                    for (var i = 0; i < nodeList.length; i++) {
+                        callback(nodeList[i]);
+                    }
+                };
+                /**
+                 * 循环双ARRAY，当相等时并做回调
+                 * @param array
+                 * @param targetArray
+                 * @param equalBack
+                 */
+                var loopArray = function (array, targetArray, equalBack) {
+                    //printTime("loopArray");
+                    var alen = array.length;
+                    var tlen = targetArray.length;
+                    for (var i = 0; i < alen; i++) {
+                        for (var j = 0; j < tlen; j++) {
+                            if (array[i][id] === targetArray[j][id]) {
+                                equalBack(array[i], targetArray[j]);
+                            }
+                        }
+                    }
+                };
+                /**
+                 * 判断是否在数组中存在该项
+                 * @param array
+                 * @param node
+                 * @returns {Number}
+                 */
+                var isExist = function (array, node) {
+                    //printTime("isExist");
+                    var len = array.length;
+                    for (var i = 0; i < len; i++) {
+                        if (array[i] === node) {
+                            return i;
+                        }
+                    }
+                    return -1;
+                };
+
+            }]
+        };
+    }]);
+
+})
